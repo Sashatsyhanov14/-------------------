@@ -1,0 +1,837 @@
+"use client";
+
+import { FormEvent, useEffect, useState } from "react";
+import {
+    Plus, Trash2, FileText, Image as ImageIcon, Video, File,
+    Pencil, Users, BarChart3, Settings as SettingsIcon, Database,
+    LayoutDashboard, Building2
+} from "lucide-react";
+import { supabase } from "@/lib/supabaseClient";
+import { Button } from "@/components/ui/Button";
+import UploadImage from "@/components/UploadImage";
+import { Sparkles, Loader2 } from "lucide-react";
+
+// --- Types ---
+type CompanyFile = {
+    id: string;
+    name: string;
+    description: string | null;
+    file_type: string | null;
+    url: string;
+    category: string;
+    sort_order: number;
+    is_active: boolean;
+    created_at: string;
+    content_text?: string;
+};
+
+type Lead = {
+    id: string;
+    name: string | null;
+    phone: string | null;
+    email: string | null;
+    source: string | null;
+    status: string | null;
+    created_at: string;
+};
+
+type TelegramManager = {
+    id: string;
+    telegram_id: number;
+    name: string | null;
+    is_active: boolean;
+    preferred_lang: string;
+    created_at: string;
+};
+
+type BotInstruction = {
+    id: string;
+    text: string;
+};
+
+type Tab = "dashboard" | "knowledge" | "managers" | "instructions";
+
+// --- Constants ---
+
+function getFileIcon(type: string | null) {
+    if (type === "image") return ImageIcon;
+    if (type === "video") return Video;
+    if (type === "document") return FileText;
+    return File;
+}
+
+export default function UnifiedBotPage() {
+    const [activeTab, setActiveTab] = useState<Tab>("instructions");
+    const locale = "ru";
+
+    const CATEGORIES = [
+        { value: "about", label: "О компании" },
+        { value: "general", label: "Общие материалы" },
+        { value: "instructions", label: "Инструкции и регламенты" },
+        { value: "license", label: "Лицензии и документы" },
+        { value: "certificate", label: "Сертификаты" },
+        { value: "presentation", label: "Презентации" },
+    ];
+
+    // --- State: Knowledge Base ---
+    const [files, setFiles] = useState<CompanyFile[]>([]);
+    const [loadingFiles, setLoadingFiles] = useState(true);
+    const [saving, setSaving] = useState(false);
+    const [editingContent, setEditingContent] = useState<{ id: string; name: string; content: string } | null>(null);
+    const [form, setForm] = useState({ name: "", description: "", file_type: "document", url: "", category: "about" });
+    const [totalSummary, setTotalSummary] = useState("");
+    const [loadingSummary, setLoadingSummary] = useState(false);
+    const [quickNote, setQuickNote] = useState("");
+    const [globalInstructions, setGlobalInstructions] = useState<BotInstruction[]>([]);
+    const [loadingInstructions, setLoadingInstructions] = useState(false);
+
+    // --- State: Dashboard & Managers ---
+    const [sessionsCount, setSessionsCount] = useState<number | null>(null);
+    const [leads, setLeads] = useState<Lead[]>([]);
+    const [loadingLeads, setLoadingLeads] = useState(true);
+    const [managers, setManagers] = useState<TelegramManager[]>([]);
+    const [managerName, setManagerName] = useState("");
+    const [managerTelegramId, setManagerTelegramId] = useState("");
+    const [managersLoading, setManagersLoading] = useState(true);
+    const [managerError, setManagerError] = useState<string | null>(null);
+    const [managerSaving, setManagerSaving] = useState(false);
+    const [managerLang, setManagerLang] = useState("ru");
+
+    // --- Load Data ---
+    useEffect(() => {
+        loadKnowledge();
+        loadBotData();
+    }, []);
+
+    useEffect(() => {
+        if (activeTab === "knowledge") {
+            loadTotalSummary();
+        }
+    }, [locale, activeTab]);
+
+    async function loadKnowledge() {
+        setLoadingFiles(true);
+        try {
+            const { data, error } = await supabase
+                .from("company_files")
+                .select("*, content_text")
+                .order("category")
+                .order("sort_order");
+            if (error) throw error;
+            setFiles(data || []);
+            loadTotalSummary();
+        } finally {
+            setLoadingFiles(false);
+        }
+    }
+
+    async function loadTotalSummary() {
+        setLoadingSummary(true);
+        try {
+            const res = await fetch(`/api/company/summary?lang=${locale}`);
+            const json = await res.json();
+            if (json.ok) {
+                setTotalSummary(json.summary);
+            } else {
+                setTotalSummary("Не удалось загрузить сводку.");
+            }
+        } catch (e) {
+            console.error("Failed to load summary", e);
+            setTotalSummary("Error loading summary");
+        } finally {
+            setLoadingSummary(false);
+        }
+    }
+
+    async function loadBotData() {
+        setLoadingLeads(true);
+        setManagersLoading(true);
+        try {
+            const [statsRes, leadsRes, managersRes] = await Promise.all([
+                fetch("/api/bot/stats"),
+                fetch("/api/leads?limit=50"),
+                fetch("/api/telegram-managers"),
+            ]);
+            const statsJson = await statsRes.json().catch(() => ({}));
+            const leadsJson = await leadsRes.json().catch(() => ({}));
+            const managersJson = await managersRes.json().catch(() => ({}));
+
+            if (statsJson?.ok) setSessionsCount(statsJson.sessionsCount ?? 0);
+            if (leadsJson?.ok && Array.isArray(leadsJson.data)) setLeads(leadsJson.data);
+            if (managersJson?.ok && Array.isArray(managersJson.data)) setManagers(managersJson.data);
+            loadGlobalInstructions();
+        } finally {
+            setLoadingLeads(false);
+            setManagersLoading(false);
+        }
+    }
+
+    async function loadGlobalInstructions() {
+        setLoadingInstructions(true);
+        try {
+            const { data, error } = await supabase
+                .from("bot_instructions")
+                .select("id, text")
+                .order("created_at", { ascending: true });
+            if (data) setGlobalInstructions(data);
+        } catch (e) {
+            console.error("Failed to load instructions", e);
+        } finally {
+            setLoadingInstructions(false);
+        }
+    }
+
+    async function handleAddInstruction() {
+        try {
+            const { data, error } = await supabase
+                .from("bot_instructions")
+                .insert({ text: "" })
+                .select()
+                .single();
+            if (data) setGlobalInstructions([...globalInstructions, data]);
+        } catch (e) {
+            console.error("Add instruction error", e);
+        }
+    }
+
+    async function handleUpdateInstruction(id: string, text: string) {
+        setGlobalInstructions(prev => prev.map(item => item.id === id ? { ...item, text } : item));
+    }
+
+    async function handleSaveInstruction(id: string, text: string) {
+        try {
+            await supabase
+                .from("bot_instructions")
+                .update({ text })
+                .eq("id", id);
+        } catch (e) {
+            console.error("Save instruction error", e);
+        }
+    }
+
+    async function handleDeleteInstruction(id: string) {
+        try {
+            await supabase.from("bot_instructions").delete().eq("id", id);
+            setGlobalInstructions(prev => prev.filter(item => item.id !== id));
+        } catch (e) {
+            console.error("Delete instruction error", e);
+        }
+    }
+
+    // --- Actions: Knowledge ---
+    async function handleQuickUpload(e: React.ChangeEvent<HTMLInputElement>) {
+        const filesToUpload = Array.from(e.target.files || []);
+        if (filesToUpload.length === 0) return;
+
+        setSaving(true);
+        try {
+            for (const file of filesToUpload) {
+                const ts = Date.now();
+                const ext = file.name.split('.').pop() || 'bin';
+                const safeName = `${ts}-${Math.random().toString(36).substring(2, 6)}.${ext}`;
+                const key = `public/company/files/${safeName}`;
+
+                const { error: uploadError } = await supabase.storage
+                    .from("property-images")
+                    .upload(key, file, { upsert: true });
+
+                if (uploadError) throw uploadError;
+                const { data: { publicUrl } } = supabase.storage.from("property-images").getPublicUrl(key);
+
+                let type = 'document';
+                const lowerExt = ext.toLowerCase();
+                if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(lowerExt)) type = 'image';
+                if (['mp4', 'mov', 'avi'].includes(lowerExt)) type = 'video';
+
+                const { data: inserted, error: dbError } = await supabase.from("company_files").insert({
+                    name: file.name,
+                    url: publicUrl,
+                    file_type: type,
+                    category: form.category || 'general',
+                    is_active: true,
+                    sort_order: 0
+                }).select().single();
+
+                if (dbError) throw dbError;
+                if (inserted) {
+                    fetch('/api/company/process', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ id: inserted.id })
+                    }).catch(console.error);
+                }
+            }
+            loadKnowledge();
+        } finally {
+            setSaving(false);
+            e.target.value = '';
+        }
+    }
+
+    async function saveContent() {
+        if (!editingContent) return;
+        setSaving(true);
+        try {
+            const { error } = await supabase
+                .from("company_files")
+                .update({ content_text: editingContent.content })
+                .eq("id", editingContent.id);
+            if (error) throw error;
+            setFiles(prev => prev.map(f => f.id === editingContent.id ? { ...f, content_text: editingContent.content } : f));
+            setEditingContent(null);
+        } finally {
+            setSaving(false);
+        }
+    }
+
+    async function handleDeleteFile(id: string) {
+        if (!confirm("Удалить?")) return;
+        try {
+            console.log("Attempting to delete file:", id);
+            const res = await fetch(`/api/company/files?id=${id}`, { method: 'DELETE' });
+            const json = await res.json().catch(() => ({}));
+
+            if (res.ok && json.ok) {
+                setFiles(prev => prev.filter(f => f.id !== id));
+            } else {
+                throw new Error(json.error || "Failed to delete file on server");
+            }
+        } catch (e: any) {
+            console.error("Delete file error:", e);
+            alert("Ошибка" + ": " + e.message);
+        }
+    }
+
+    // --- Actions: Managers ---
+    async function handleAddManager(e: FormEvent) {
+        e.preventDefault();
+        const trimmedId = managerTelegramId.trim();
+        if (!trimmedId) return;
+
+        setManagerError(null);
+        setManagerSaving(true);
+        try {
+            const res = await fetch("/api/telegram-managers", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    telegram_id: trimmedId,
+                    name: managerName.trim() || null,
+                    preferred_lang: managerLang
+                }),
+            });
+            const json = await res.json().catch(() => ({}));
+            if (res.ok && json?.ok && json.data) {
+                setManagers(prev => [json.data as TelegramManager, ...prev]);
+                setManagerName("");
+                setManagerTelegramId("");
+                setManagerLang("ru");
+            } else {
+                setManagerError(json?.error || "Ошибка");
+            }
+        } finally {
+            setManagerSaving(false);
+        }
+    }
+
+    async function handleDeleteManager(id: string) {
+        if (!confirm("Удалить?")) return;
+        try {
+            const res = await fetch(`/api/telegram-managers/${id}`, { method: "DELETE" });
+            if (res.ok) {
+                setManagers(prev => prev.filter(m => m.id !== id));
+            } else {
+                const json = await res.json().catch(() => ({}));
+                alert("Ошибка: " + (json.error || "Error"));
+            }
+        } catch (err: any) {
+            console.error("Delete manager error:", err);
+            alert("Ошибка: " + err.message);
+        }
+    }
+
+    async function handleToggleManager(manager: TelegramManager) {
+        try {
+            const res = await fetch(`/api/telegram-managers/${manager.id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ is_active: !manager.is_active }),
+            });
+            const json = await res.json().catch(() => ({}));
+            if (res.ok && json?.ok && json.data) {
+                setManagers(prev => prev.map(m => m.id === json.data.id ? json.data : m));
+            } else {
+                const errorText = json?.error || "Ошибка";
+                alert(errorText);
+            }
+        } catch (err: any) {
+            console.error("Toggle manager error:", err);
+            alert("Ошибка: " + err.message);
+        }
+    }
+
+    async function handleUpdateManagerLang(id: string, lang: string) {
+        try {
+            const res = await fetch(`/api/telegram-managers/${id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ preferred_lang: lang }),
+            });
+            const json = await res.json().catch(() => ({}));
+            if (res.ok && json?.ok && json.data) {
+                setManagers(prev => prev.map(m => m.id === json.data.id ? json.data : m));
+            }
+        } catch (err: any) {
+            console.error("Update manager lang error:", err);
+        }
+    }
+
+    const groupedFiles = CATEGORIES.map((cat) => ({
+        ...cat,
+        files: files.filter((f) => f.category === cat.value || (cat.value === 'general' && !f.category)),
+    })).filter((cat) => cat.files.length > 0 || cat.value === 'general');
+
+    return (
+        <div className="mx-auto max-w-6xl px-6 py-6">
+            <header className="mb-8 flex items-center justify-between">
+                <div>
+                    <h1 className="text-3xl font-bold text-neutral-50">Настройки ИИ Задачи</h1>
+                    <p className="mt-1 text-sm text-neutral-400">
+                        Управление базой знаний, инструкциями и доступом менеджеров.
+                    </p>
+                </div>
+            </header>
+
+            {/* Tabs */}
+            <div className="mb-8 flex flex-wrap gap-1 rounded-xl bg-neutral-900/50 p-1 w-fit border border-neutral-800">
+                <button
+                    onClick={() => setActiveTab("instructions")}
+                    className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all ${activeTab === "instructions" ? "bg-zinc-800 text-white shadow-sm" : "text-neutral-400 hover:text-neutral-200"
+                        }`}
+                >
+                    <FileText className="h-4 w-4" /> Инструкции
+                </button>
+                <button
+                    onClick={() => setActiveTab("knowledge")}
+                    className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all ${activeTab === "knowledge" ? "bg-zinc-800 text-white shadow-sm" : "text-neutral-400 hover:text-neutral-200"
+                        }`}
+                >
+                    <Database className="h-4 w-4" /> База знаний
+                </button>
+                <button
+                    onClick={() => setActiveTab("managers")}
+                    className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all ${activeTab === "managers" ? "bg-zinc-800 text-white shadow-sm" : "text-neutral-400 hover:text-neutral-200"
+                        }`}
+                >
+                    <Users className="h-4 w-4" /> Менеджеры
+                </button>
+            </div>
+
+
+            {/* Tab: Knowledge Base */}
+            {activeTab === "knowledge" && (
+                <div className="space-y-12 animate-in fade-in slide-in-from-bottom-2 pb-20">
+
+                    {/* 1. QUICK ADD & UPLOAD */}
+                    <section className="space-y-4">
+                        <div className="rounded-2xl border border-neutral-800 bg-neutral-900/40 p-6">
+                            <h2 className="text-sm font-semibold text-neutral-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                                <Plus className="h-4 w-4" /> Добавить быструю заметку
+                            </h2>
+                            <div className="space-y-4">
+                                <textarea
+                                    className="w-full h-32 bg-neutral-950 border border-neutral-800 rounded-xl p-4 text-sm text-neutral-300 leading-relaxed outline-none focus:border-blue-700 transition-all resize-none"
+                                    placeholder="Вставьте текст или напишите заметку (она станет частью базы знаний)..."
+                                    value={quickNote}
+                                    onChange={(e) => setQuickNote(e.target.value)}
+                                />
+                                <div className="flex items-center justify-between gap-4">
+                                    <div className="flex items-center gap-3">
+                                        <label className={`
+                                            flex items-center gap-2 px-4 py-2 rounded-xl border border-neutral-800 bg-neutral-950 text-sm font-medium text-neutral-400 cursor-pointer transition-all hover:bg-neutral-900 hover:text-white
+                                            ${saving ? 'opacity-50 cursor-not-allowed' : ''}
+                                        `}>
+                                            <ImageIcon className="h-4 w-4" /> Загрузить файл
+                                            <input type="file" multiple className="hidden"
+                                                onChange={(e) => {
+                                                    setForm(prev => ({ ...prev, category: 'general' }));
+                                                    handleQuickUpload(e);
+                                                }}
+                                                disabled={saving}
+                                            />
+                                        </label>
+                                    </div>
+                                    <Button
+                                        disabled={!quickNote.trim() || saving}
+                                        onClick={async () => {
+                                            setSaving(true);
+                                            const { error } = await supabase.from("company_files").insert({
+                                                name: `Заметка ${new Date().toLocaleString()}`,
+                                                file_type: "text",
+                                                url: "manual-entry",
+                                                category: "general",
+                                                content_text: quickNote,
+                                                is_active: true
+                                            });
+                                            if (!error) {
+                                                setQuickNote("");
+                                                loadKnowledge();
+                                            } else {
+                                                alert(error.message);
+                                            }
+                                            setSaving(false);
+                                        }}
+                                    >
+                                        {saving ? "Сохранение..." : "Добавить заметку"}
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* 2. KNOWLEDGE LIST */}
+                    <section className="space-y-6">
+                        <h2 className="text-sm font-semibold text-neutral-400 uppercase tracking-widest ml-1">МАТЕРИАЛЫ</h2>
+                        <div className="space-y-8">
+                            {groupedFiles.map((group) => (
+                                <div key={group.value} className="space-y-4">
+                                    {group.files.length > 0 && <h3 className="text-xs font-medium text-neutral-500 uppercase tracking-widest pl-4">{group.label}</h3>}
+                                    <div className="grid grid-cols-1 gap-4">
+                                        {group.files.map((file) => {
+                                            const Icon = getFileIcon(file.file_type);
+                                            return (
+                                                <div key={file.id} className="group relative rounded-2xl border border-neutral-800 bg-neutral-900/40 p-5 transition-all hover:bg-neutral-900/60 border-l-2 border-l-blue-500/20">
+                                                    <div className="flex items-start justify-between">
+                                                        <div className="flex gap-4 items-center">
+                                                            <div className="shrink-0">
+                                                                {file.file_type === "image" ? (
+                                                                    <img src={file.url} alt="" className="w-10 h-10 rounded-lg object-cover border border-neutral-800" />
+                                                                ) : (
+                                                                    <div className="w-10 h-10 rounded-lg bg-neutral-800 flex items-center justify-center text-neutral-500 border border-neutral-700">
+                                                                        <Icon className="h-5 w-5" />
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                            <div>
+                                                                <div className="font-medium text-neutral-200 text-sm">{file.name}</div>
+                                                                <div className="text-[10px] text-neutral-500 mt-0.5 uppercase tracking-wider">
+                                                                    {new Date(file.created_at).toLocaleDateString()}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex gap-2">
+                                                            <button
+                                                                onClick={() => setEditingContent({ id: file.id, name: file.name, content: file.content_text || "" })}
+                                                                className="p-2 rounded-lg hover:bg-neutral-800 text-neutral-400 hover:text-white transition-colors"
+                                                            >
+                                                                <Pencil className="h-4 w-4" />
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleDeleteFile(file.id)}
+                                                                className="p-2 rounded-lg hover:bg-red-900/20 text-neutral-500 hover:text-red-400 transition-colors"
+                                                            >
+                                                                <Trash2 className="h-4 w-4" />
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </section>
+
+                    {/* 3. AI TOTAL SUMMARY */}
+                    <section className="pt-8 border-t border-neutral-800">
+                        <div className="rounded-3xl border border-blue-500/20 bg-blue-500/5 p-8 relative overflow-hidden">
+                            <div className="absolute top-0 right-0 p-8 opacity-10">
+                                <Sparkles className="h-24 w-24 text-blue-500" />
+                            </div>
+
+                            <div className="relative">
+                                <div className="flex items-center justify-between mb-6">
+                                    <h2 className="text-xl font-bold text-neutral-50 flex items-center gap-3">
+                                        <Sparkles className="h-5 w-5 text-blue-400" /> Сводка (как бот сейчас понимает компанию)
+                                    </h2>
+                                    <Button
+                                        variant="secondary"
+                                        onClick={loadTotalSummary}
+                                        disabled={loadingSummary}
+                                        className="bg-neutral-900/50 hover:bg-neutral-800 border-neutral-700 h-8 px-3 text-xs"
+                                    >
+                                        {loadingSummary ? <Loader2 className="h-3 w-3 animate-spin mr-2" /> : <Plus className="h-3 w-3 mr-2 rotate-45" />}
+                                        Обновить
+                                    </Button>
+                                </div>
+
+                                {loadingSummary ? (
+                                    <div className="flex flex-col items-center justify-center py-12 space-y-4">
+                                        <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+                                        <p className="text-sm text-neutral-400 animate-pulse">Генерируем свежую выжимку знаний...</p>
+                                    </div>
+                                ) : (
+                                    <div className="prose prose-invert prose-blue max-w-none">
+                                        <div className="text-neutral-300 leading-relaxed text-sm whitespace-pre-wrap font-sans">
+                                            {totalSummary || "Нет данных для сводки"}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </section>
+                </div>
+            )}
+
+
+            {/* Tab: Managers */}
+            {activeTab === "managers" && (
+                <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2">
+                    <section className="rounded-2xl border border-neutral-800 bg-neutral-900/40 p-8 shadow-sm">
+                        <div className="mb-6">
+                            <h2 className="text-xl font-bold text-neutral-50 mb-1">Менеджеры в Telegram</h2>
+                        </div>
+                        <form onSubmit={handleAddManager} className="flex flex-col gap-4 md:flex-row md:items-end">
+                            <div className="flex-1 space-y-2">
+                                <label className="text-xs font-medium text-neutral-400 ml-1">Имя менеджера</label>
+                                <input
+                                    className="w-full rounded-xl border border-neutral-800 bg-neutral-950 px-4 py-3 text-sm text-neutral-100 outline-none focus:border-blue-500 transition-all"
+                                    value={managerName}
+                                    onChange={(e) => setManagerName(e.target.value)}
+                                    placeholder="Анна"
+                                />
+                            </div>
+                            <div className="flex-1 space-y-2">
+                                <label className="text-xs font-medium text-neutral-400 ml-1">Telegram ID</label>
+                                <input
+                                    className="w-full rounded-xl border border-neutral-800 bg-neutral-950 px-4 py-3 text-sm text-neutral-100 outline-none focus:border-blue-500 transition-all"
+                                    value={managerTelegramId}
+                                    onChange={(e) => setManagerTelegramId(e.target.value)}
+                                    placeholder="123456789"
+                                />
+                            </div>
+                            <div className="w-32 space-y-2">
+                                <label className="text-xs font-medium text-neutral-400 ml-1">Язык</label>
+                                <select
+                                    className="w-full rounded-xl border border-neutral-800 bg-neutral-950 px-4 py-3 text-sm text-neutral-100 outline-none focus:border-blue-500 transition-all cursor-pointer"
+                                    value={managerLang}
+                                    onChange={(e) => setManagerLang(e.target.value)}
+                                >
+                                    <option value="ru">RU</option>
+                                    <option value="en">EN</option>
+                                    <option value="tr">TR</option>
+                                </select>
+                            </div>
+                            <Button
+                                type="submit"
+                                disabled={!managerTelegramId.trim() || managerSaving}
+                                className="h-[46px] px-8 bg-gradient-to-tr from-blue-600 to-blue-400 hover:from-blue-500 hover:to-blue-300 text-white font-bold rounded-xl shadow-lg shadow-blue-900/20 border-0 transition-all active:scale-95"
+                            >
+                                {managerSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Добавить"}
+                            </Button>
+                        </form>
+                        {managerError && <p className="mt-4 text-xs text-red-400">{managerError}</p>}
+                    </section>
+
+                    <div className="overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-900/20 backdrop-blur-sm">
+                        <table className="w-full text-sm text-neutral-300">
+                            <thead className="bg-neutral-900/80 backdrop-blur-md text-xs uppercase tracking-wide text-neutral-500">
+                                <tr className="border-b border-neutral-800">
+                                    <th className="px-4 py-3 text-left">Имя</th>
+                                    <th className="px-4 py-3 text-left font-mono text-[10px] text-neutral-500 uppercase">Telegram ID</th>
+                                    <th className="px-4 py-3 text-center">Язык</th>
+                                    <th className="px-4 py-3 text-center">Статус</th>
+                                    <th className="px-4 py-3 text-right">Действия</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-neutral-800/50">
+                                {managers.map((m) => (
+                                    <tr key={m.id} className="hover:bg-white/5 transition-colors">
+                                        <td className="px-4 py-3 font-medium">{m.name || "Без имени"}</td>
+                                        <td className="px-4 py-3 text-neutral-500 font-mono">{m.telegram_id}</td>
+                                        <td className="px-4 py-3 text-center">
+                                            <div className="inline-block relative">
+                                                <select
+                                                    className="appearance-none bg-neutral-900/50 border border-neutral-800 rounded-lg px-2 py-1 text-[10px] font-bold text-neutral-400 outline-none cursor-pointer hover:text-white hover:border-neutral-700 transition-all pr-6"
+                                                    value={m.preferred_lang || "ru"}
+                                                    onChange={(e) => handleUpdateManagerLang(m.id, e.target.value)}
+                                                >
+                                                    <option value="ru" className="bg-neutral-950">RU</option>
+                                                    <option value="en" className="bg-neutral-950">EN</option>
+                                                    <option value="tr" className="bg-neutral-950">TR</option>
+                                                </select>
+                                                <div className="absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none opacity-50">
+                                                    <Plus className="h-2 w-2 rotate-45" />
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="px-4 py-3 align-middle">
+                                            <div className="flex items-center justify-center">
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleToggleManager(m);
+                                                    }}
+                                                    className={`
+                                                        w-8 h-4 flex items-center rounded-full p-0.5 cursor-pointer transition-colors duration-200 outline-none
+                                                        ${m.is_active ? "bg-emerald-500" : "bg-neutral-600"}
+                                                    `}
+                                                >
+                                                    <div className={`
+                                                        bg-white w-3 h-3 rounded-full shadow-sm transform transition-transform duration-200
+                                                        ${m.is_active ? "translate-x-4" : "translate-x-0"}
+                                                    `} />
+                                                </button>
+                                            </div>
+                                        </td>
+                                        <td className="px-4 py-3 text-right">
+                                            <button
+                                                onClick={() => handleDeleteManager(m.id)}
+                                                className="p-1.5 rounded hover:bg-red-900/30 text-neutral-500 hover:text-red-400 transition-colors"
+                                            ><Trash2 className="h-4 w-4" /></button>
+                                        </td>
+                                    </tr>
+                                ))}
+                                {managers.length === 0 && !managersLoading && (
+                                    <tr><td colSpan={5} className="p-8 text-center text-neutral-500 italic">Пока менеджеров нет</td></tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
+
+            {/* Editing Modal */}
+            {editingContent && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+                    <div className="w-full max-w-2xl rounded-2xl border border-neutral-800 bg-neutral-950 p-6 shadow-2xl">
+                        <div className="mb-4 flex items-center justify-between">
+                            <h3 className="text-lg font-semibold">
+                                {editingContent?.id === "new" ? "Добавить заметку" : `Редактировать: ${editingContent?.name}`}
+                            </h3>
+                            <button onClick={() => setEditingContent(null)} className="rounded p-1 text-neutral-400 hover:bg-neutral-900 hover:text-white transition-colors">
+                                Отмена
+                            </button>
+                        </div>
+
+                        {editingContent?.id === "new" && (
+                            <div className="mb-4">
+                                <input
+                                    className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-3 text-sm focus:border-blue-500 outline-none transition-all"
+                                    placeholder="Название заметки (видит только админ)"
+                                    value={form.name}
+                                    onChange={e => setForm({ ...form, name: e.target.value })}
+                                    autoFocus
+                                />
+                            </div>
+                        )}
+
+                        <div className="space-y-2">
+                            <textarea
+                                className="w-full h-96 bg-neutral-900/30 border border-neutral-800 rounded-2xl p-4 text-sm font-mono text-neutral-300 leading-relaxed outline-none focus:border-blue-900 transition-colors resize-none"
+                                value={editingContent?.content || ""}
+                                onChange={e => setEditingContent(prev => prev ? { ...prev, content: e.target.value } : null)}
+                                placeholder="Текст заметки / выжимка документа..."
+                            />
+                        </div>
+
+                        <div className="mt-8 flex justify-end gap-3">
+                            <Button variant="secondary" onClick={() => setEditingContent(null)}>Отмена</Button>
+                            <Button
+                                onClick={async () => {
+                                    if (editingContent?.id === "new") {
+                                        if (!form.name) return alert("Введите название");
+                                        setSaving(true);
+                                        const { error } = await supabase.from("company_files").insert({
+                                            name: form.name,
+                                            file_type: "text",
+                                            url: "manual-entry",
+                                            category: form.category || "general",
+                                            content_text: editingContent?.content,
+                                            is_active: true
+                                        });
+                                        setSaving(false);
+                                        if (!error) {
+                                            setEditingContent(null);
+                                            loadKnowledge();
+                                        } else {
+                                            alert(error.message);
+                                        }
+                                    } else {
+                                        saveContent();
+                                    }
+                                }}
+                                disabled={saving}
+                            >
+                                {saving ? "Загрузка..." : "Сохранить"}
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Tab: Global Instructions */}
+            {activeTab === "instructions" && (
+                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
+                    <section className="rounded-2xl border border-neutral-800 bg-neutral-900/40 p-6">
+                        <div className="flex items-center justify-between mb-8">
+                            <div>
+                                <h2 className="text-xl font-bold text-neutral-100 italic">Глобальные инструкции боту (Промпт)</h2>
+                                <p className="text-sm text-neutral-400 mt-1">
+                                    Эти правила всегда включены в контекст ИИ.
+                                </p>
+                            </div>
+                            <Button
+                                onClick={handleAddInstruction}
+                                variant="secondary"
+                                className="gap-2 bg-blue-600/10 text-blue-400 border-blue-600/20 hover:bg-blue-600/20"
+                            >
+                                <Plus className="h-4 w-4" /> Добавить правило
+                            </Button>
+                        </div>
+
+                        {loadingInstructions ? (
+                            <div className="flex justify-center py-12">
+                                <Loader2 className="h-8 w-8 animate-spin text-neutral-600" />
+                            </div>
+                        ) : (
+                            <div className="space-y-4">
+                                {globalInstructions.map((instruction, index) => (
+                                    <div key={instruction.id} className="group relative flex gap-4 items-start bg-neutral-950/50 border border-neutral-800/50 rounded-xl p-4 transition-all hover:border-neutral-700/50">
+                                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-neutral-900 text-sm font-bold text-neutral-500">
+                                            {index + 1}
+                                        </div>
+                                        <div className="flex-1 space-y-2">
+                                            <textarea
+                                                className="w-full bg-transparent border-none p-0 text-sm text-neutral-200 placeholder:text-neutral-600 focus:ring-0 resize-none min-h-[60px]"
+                                                placeholder="Например: 'Упоминай гарантию на сделки'..."
+                                                value={instruction.text}
+                                                onChange={(e) => handleUpdateInstruction(instruction.id, e.target.value)}
+                                                onBlur={(e) => handleSaveInstruction(instruction.id, e.target.value)}
+                                            />
+                                        </div>
+                                        <button
+                                            onClick={() => handleDeleteInstruction(instruction.id)}
+                                            className="p-2 rounded-lg text-neutral-600 hover:text-red-400 hover:bg-red-400/10 transition-all"
+                                            title="Удалить"
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                        </button>
+                                    </div>
+                                ))}
+
+                                {globalInstructions.length === 0 && (
+                                    <div className="text-center py-12 border-2 border-dashed border-neutral-800 rounded-2xl">
+                                        <p className="text-neutral-500">Нет инструкций. Бот будет использовать стандартный ИИ-помощника.</p>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </section>
+                </div>
+            )}
+        </div>
+    );
+}
