@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { supabase } from "@/lib/supabaseClient";
 
 type UploadEntity = "units" | "developer_projects" | "rent_units" | "company";
 
@@ -37,12 +36,19 @@ export default function UploadImage({
         const randomStr = Math.random().toString(36).substring(2, 10);
         const safeName = `${ts}-${randomStr}.${ext}`;
         const key = `${ownerUid}/${entity}/${entityId}/${safeName}`;
-        const { error } = await supabase.storage
-          .from("unit_photos")
-          .upload(key, file, { upsert: true });
-        if (error) throw error;
-        const { data: pub } = supabase.storage.from("unit_photos").getPublicUrl(key);
-        if (pub?.publicUrl) onUploaded(pub.publicUrl);
+
+        // Upload via server API (uses service_role key to bypass RLS)
+        const bucket = entity === "company" ? "company_files" : "unit_photos";
+        const fd = new FormData();
+        fd.append("file", file);
+        fd.append("bucket", bucket);
+        fd.append("path", key);
+
+        const res = await fetch("/api/storage/upload", { method: "POST", body: fd });
+        const json = await res.json();
+
+        if (!json.ok) throw new Error(json.error || "Upload failed");
+        if (json.url) onUploaded(json.url);
       }
     } catch (e: any) {
       alert(e.message || "Не удалось загрузить файл");
