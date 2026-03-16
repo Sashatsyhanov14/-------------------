@@ -95,7 +95,6 @@ export default function UnifiedBotPage() {
     const [managersLoading, setManagersLoading] = useState(true);
     const [managerError, setManagerError] = useState<string | null>(null);
     const [managerSaving, setManagerSaving] = useState(false);
-    const [managerLang, setManagerLang] = useState("ru");
 
     // --- Load Data ---
     useEffect(() => {
@@ -317,7 +316,7 @@ export default function UnifiedBotPage() {
                 body: JSON.stringify({
                     telegram_id: trimmedId,
                     name: managerName.trim() || null,
-                    preferred_lang: managerLang
+                    preferred_lang: "ru"
                 }),
             });
             const json = await res.json().catch(() => ({}));
@@ -325,7 +324,6 @@ export default function UnifiedBotPage() {
                 setManagers(prev => [json.data as TelegramManager, ...prev]);
                 setManagerName("");
                 setManagerTelegramId("");
-                setManagerLang("ru");
             } else {
                 setManagerError(json?.error || "Ошибка");
             }
@@ -611,18 +609,6 @@ export default function UnifiedBotPage() {
                                     placeholder="123456789"
                                 />
                             </div>
-                            <div className="w-32 space-y-2">
-                                <label className="text-xs font-medium text-neutral-400 ml-1">Язык</label>
-                                <select
-                                    className="w-full rounded-xl border border-neutral-800 bg-neutral-950 px-4 py-3 text-sm text-neutral-100 outline-none focus:border-blue-500 transition-all cursor-pointer"
-                                    value={managerLang}
-                                    onChange={(e) => setManagerLang(e.target.value)}
-                                >
-                                    <option value="ru">RU</option>
-                                    <option value="en">EN</option>
-                                    <option value="tr">TR</option>
-                                </select>
-                            </div>
                             <Button
                                 type="submit"
                                 disabled={!managerTelegramId.trim() || managerSaving}
@@ -640,7 +626,6 @@ export default function UnifiedBotPage() {
                                 <tr className="border-b border-neutral-800">
                                     <th className="px-4 py-3 text-left">Имя</th>
                                     <th className="px-4 py-3 text-left font-mono text-[10px] text-neutral-500 uppercase">Telegram ID</th>
-                                    <th className="px-4 py-3 text-center">Язык</th>
                                     <th className="px-4 py-3 text-center">Статус</th>
                                     <th className="px-4 py-3 text-right">Действия</th>
                                 </tr>
@@ -650,22 +635,6 @@ export default function UnifiedBotPage() {
                                     <tr key={m.id} className="hover:bg-white/5 transition-colors">
                                         <td className="px-4 py-3 font-medium">{m.name || "Без имени"}</td>
                                         <td className="px-4 py-3 text-neutral-500 font-mono">{m.telegram_id}</td>
-                                        <td className="px-4 py-3 text-center">
-                                            <div className="inline-block relative">
-                                                <select
-                                                    className="appearance-none bg-neutral-900/50 border border-neutral-800 rounded-lg px-2 py-1 text-[10px] font-bold text-neutral-400 outline-none cursor-pointer hover:text-white hover:border-neutral-700 transition-all pr-6"
-                                                    value={m.preferred_lang || "ru"}
-                                                    onChange={(e) => handleUpdateManagerLang(m.id, e.target.value)}
-                                                >
-                                                    <option value="ru" className="bg-neutral-950">RU</option>
-                                                    <option value="en" className="bg-neutral-950">EN</option>
-                                                    <option value="tr" className="bg-neutral-950">TR</option>
-                                                </select>
-                                                <div className="absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none opacity-50">
-                                                    <Plus className="h-2 w-2 rotate-45" />
-                                                </div>
-                                            </div>
-                                        </td>
                                         <td className="px-4 py-3 align-middle">
                                             <div className="flex items-center justify-center">
                                                 <button
@@ -701,137 +670,142 @@ export default function UnifiedBotPage() {
                         </table>
                     </div>
                 </div>
-            )}
+            )
+            }
 
             {/* Editing Modal */}
-            {editingContent && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-                    <div className="w-full max-w-2xl rounded-2xl border border-neutral-800 bg-neutral-950 p-6 shadow-2xl">
-                        <div className="mb-4 flex items-center justify-between">
-                            <h3 className="text-lg font-semibold">
-                                {editingContent?.id === "new" ? "Добавить заметку" : `Редактировать: ${editingContent?.name}`}
-                            </h3>
-                            <button onClick={() => setEditingContent(null)} className="rounded p-1 text-neutral-400 hover:bg-neutral-900 hover:text-white transition-colors">
-                                Отмена
-                            </button>
-                        </div>
+            {
+                editingContent && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+                        <div className="w-full max-w-2xl rounded-2xl border border-neutral-800 bg-neutral-950 p-6 shadow-2xl">
+                            <div className="mb-4 flex items-center justify-between">
+                                <h3 className="text-lg font-semibold">
+                                    {editingContent?.id === "new" ? "Добавить заметку" : `Редактировать: ${editingContent?.name}`}
+                                </h3>
+                                <button onClick={() => setEditingContent(null)} className="rounded p-1 text-neutral-400 hover:bg-neutral-900 hover:text-white transition-colors">
+                                    Отмена
+                                </button>
+                            </div>
 
-                        {editingContent?.id === "new" && (
-                            <div className="mb-4">
-                                <input
-                                    className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-3 text-sm focus:border-blue-500 outline-none transition-all"
-                                    placeholder="Название заметки (видит только админ)"
-                                    value={form.name}
-                                    onChange={e => setForm({ ...form, name: e.target.value })}
-                                    autoFocus
+                            {editingContent?.id === "new" && (
+                                <div className="mb-4">
+                                    <input
+                                        className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-3 text-sm focus:border-blue-500 outline-none transition-all"
+                                        placeholder="Название заметки (видит только админ)"
+                                        value={form.name}
+                                        onChange={e => setForm({ ...form, name: e.target.value })}
+                                        autoFocus
+                                    />
+                                </div>
+                            )}
+
+                            <div className="space-y-2">
+                                <textarea
+                                    className="w-full h-96 bg-neutral-900/30 border border-neutral-800 rounded-2xl p-4 text-sm font-mono text-neutral-300 leading-relaxed outline-none focus:border-blue-900 transition-colors resize-none"
+                                    value={editingContent?.content || ""}
+                                    onChange={e => setEditingContent(prev => prev ? { ...prev, content: e.target.value } : null)}
+                                    placeholder="Текст заметки / выжимка документа..."
                                 />
                             </div>
-                        )}
 
-                        <div className="space-y-2">
-                            <textarea
-                                className="w-full h-96 bg-neutral-900/30 border border-neutral-800 rounded-2xl p-4 text-sm font-mono text-neutral-300 leading-relaxed outline-none focus:border-blue-900 transition-colors resize-none"
-                                value={editingContent?.content || ""}
-                                onChange={e => setEditingContent(prev => prev ? { ...prev, content: e.target.value } : null)}
-                                placeholder="Текст заметки / выжимка документа..."
-                            />
-                        </div>
-
-                        <div className="mt-8 flex justify-end gap-3">
-                            <Button variant="secondary" onClick={() => setEditingContent(null)}>Отмена</Button>
-                            <Button
-                                onClick={async () => {
-                                    if (editingContent?.id === "new") {
-                                        if (!form.name) return alert("Введите название");
-                                        setSaving(true);
-                                        const { error } = await supabase.from("company_files").insert({
-                                            name: form.name,
-                                            file_type: "text",
-                                            url: "manual-entry",
-                                            category: form.category || "general",
-                                            content_text: editingContent?.content,
-                                            is_active: true
-                                        });
-                                        setSaving(false);
-                                        if (!error) {
-                                            setEditingContent(null);
-                                            loadKnowledge();
+                            <div className="mt-8 flex justify-end gap-3">
+                                <Button variant="secondary" onClick={() => setEditingContent(null)}>Отмена</Button>
+                                <Button
+                                    onClick={async () => {
+                                        if (editingContent?.id === "new") {
+                                            if (!form.name) return alert("Введите название");
+                                            setSaving(true);
+                                            const { error } = await supabase.from("company_files").insert({
+                                                name: form.name,
+                                                file_type: "text",
+                                                url: "manual-entry",
+                                                category: form.category || "general",
+                                                content_text: editingContent?.content,
+                                                is_active: true
+                                            });
+                                            setSaving(false);
+                                            if (!error) {
+                                                setEditingContent(null);
+                                                loadKnowledge();
+                                            } else {
+                                                alert(error.message);
+                                            }
                                         } else {
-                                            alert(error.message);
+                                            saveContent();
                                         }
-                                    } else {
-                                        saveContent();
-                                    }
-                                }}
-                                disabled={saving}
-                            >
-                                {saving ? "Загрузка..." : "Сохранить"}
-                            </Button>
+                                    }}
+                                    disabled={saving}
+                                >
+                                    {saving ? "Загрузка..." : "Сохранить"}
+                                </Button>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
+                )
+            }
 
             {/* Tab: Global Instructions */}
-            {activeTab === "instructions" && (
-                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
-                    <section className="rounded-2xl border border-neutral-800 bg-neutral-900/40 p-6">
-                        <div className="flex items-center justify-between mb-8">
-                            <div>
-                                <h2 className="text-xl font-bold text-neutral-100 italic">Глобальные инструкции боту (Промпт)</h2>
-                                <p className="text-sm text-neutral-400 mt-1">
-                                    Эти правила всегда включены в контекст ИИ.
-                                </p>
+            {
+                activeTab === "instructions" && (
+                    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
+                        <section className="rounded-2xl border border-neutral-800 bg-neutral-900/40 p-6">
+                            <div className="flex items-center justify-between mb-8">
+                                <div>
+                                    <h2 className="text-xl font-bold text-neutral-100 italic">Глобальные инструкции боту (Промпт)</h2>
+                                    <p className="text-sm text-neutral-400 mt-1">
+                                        Эти правила всегда включены в контекст ИИ.
+                                    </p>
+                                </div>
+                                <Button
+                                    onClick={handleAddInstruction}
+                                    variant="secondary"
+                                    className="gap-2 bg-blue-600/10 text-blue-400 border-blue-600/20 hover:bg-blue-600/20"
+                                >
+                                    <Plus className="h-4 w-4" /> Добавить правило
+                                </Button>
                             </div>
-                            <Button
-                                onClick={handleAddInstruction}
-                                variant="secondary"
-                                className="gap-2 bg-blue-600/10 text-blue-400 border-blue-600/20 hover:bg-blue-600/20"
-                            >
-                                <Plus className="h-4 w-4" /> Добавить правило
-                            </Button>
-                        </div>
 
-                        {loadingInstructions ? (
-                            <div className="flex justify-center py-12">
-                                <Loader2 className="h-8 w-8 animate-spin text-neutral-600" />
-                            </div>
-                        ) : (
-                            <div className="space-y-4">
-                                {globalInstructions.map((instruction, index) => (
-                                    <div key={instruction.id} className="group relative flex gap-4 items-start bg-neutral-950/50 border border-neutral-800/50 rounded-xl p-4 transition-all hover:border-neutral-700/50">
-                                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-neutral-900 text-sm font-bold text-neutral-500">
-                                            {index + 1}
+                            {loadingInstructions ? (
+                                <div className="flex justify-center py-12">
+                                    <Loader2 className="h-8 w-8 animate-spin text-neutral-600" />
+                                </div>
+                            ) : (
+                                <div className="space-y-4">
+                                    {globalInstructions.map((instruction, index) => (
+                                        <div key={instruction.id} className="group relative flex gap-4 items-start bg-neutral-950/50 border border-neutral-800/50 rounded-xl p-4 transition-all hover:border-neutral-700/50">
+                                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-neutral-900 text-sm font-bold text-neutral-500">
+                                                {index + 1}
+                                            </div>
+                                            <div className="flex-1 space-y-2">
+                                                <textarea
+                                                    className="w-full bg-transparent border-none p-0 text-sm text-neutral-200 placeholder:text-neutral-600 focus:ring-0 resize-none min-h-[60px]"
+                                                    placeholder="Например: 'Упоминай гарантию на сделки'..."
+                                                    value={instruction.text}
+                                                    onChange={(e) => handleUpdateInstruction(instruction.id, e.target.value)}
+                                                    onBlur={(e) => handleSaveInstruction(instruction.id, e.target.value)}
+                                                />
+                                            </div>
+                                            <button
+                                                onClick={() => handleDeleteInstruction(instruction.id)}
+                                                className="p-2 rounded-lg text-neutral-600 hover:text-red-400 hover:bg-red-400/10 transition-all"
+                                                title="Удалить"
+                                            >
+                                                <Trash2 className="h-4 w-4" />
+                                            </button>
                                         </div>
-                                        <div className="flex-1 space-y-2">
-                                            <textarea
-                                                className="w-full bg-transparent border-none p-0 text-sm text-neutral-200 placeholder:text-neutral-600 focus:ring-0 resize-none min-h-[60px]"
-                                                placeholder="Например: 'Упоминай гарантию на сделки'..."
-                                                value={instruction.text}
-                                                onChange={(e) => handleUpdateInstruction(instruction.id, e.target.value)}
-                                                onBlur={(e) => handleSaveInstruction(instruction.id, e.target.value)}
-                                            />
-                                        </div>
-                                        <button
-                                            onClick={() => handleDeleteInstruction(instruction.id)}
-                                            className="p-2 rounded-lg text-neutral-600 hover:text-red-400 hover:bg-red-400/10 transition-all"
-                                            title="Удалить"
-                                        >
-                                            <Trash2 className="h-4 w-4" />
-                                        </button>
-                                    </div>
-                                ))}
+                                    ))}
 
-                                {globalInstructions.length === 0 && (
-                                    <div className="text-center py-12 border-2 border-dashed border-neutral-800 rounded-2xl">
-                                        <p className="text-neutral-500">Нет инструкций. Бот будет использовать стандартный ИИ-помощника.</p>
-                                    </div>
-                                )}
-                            </div>
-                        )}
-                    </section>
-                </div>
-            )}
-        </div>
+                                    {globalInstructions.length === 0 && (
+                                        <div className="text-center py-12 border-2 border-dashed border-neutral-800 rounded-2xl">
+                                            <p className="text-neutral-500">Нет инструкций. Бот будет использовать стандартный ИИ-помощника.</p>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </section>
+                    </div>
+                )
+            }
+        </div >
     );
 }
