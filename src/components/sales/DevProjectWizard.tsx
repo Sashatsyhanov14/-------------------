@@ -132,21 +132,21 @@ export default function DevProjectWizard({ projectId }: { projectId: string }) {
                 <option value="turnkey">С ремонтом</option>
               </select>
             </Field>
-            <Field label="Цена от, €*">
+            <Field label="Цена от, ₽*">
               <input
                 type="number"
                 value={typeForm.price_from}
                 onChange={(e) => setTypeForm((f) => ({ ...f, price_from: Number(e.target.value) }))}
               />
             </Field>
-            <Field label="Цена за м², €">
+            <Field label="Цена за м², ₽">
               <input
                 type="number"
                 value={typeForm.price_per_m2}
                 onChange={(e) => setTypeForm((f) => ({ ...f, price_per_m2: Number(e.target.value) }))}
               />
             </Field>
-            <Field label="Надбавка за этаж, €">
+            <Field label="Надбавка за этаж, ₽">
               <input
                 type="number"
                 value={typeForm.floor_markup}

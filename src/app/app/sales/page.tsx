@@ -132,7 +132,7 @@ export default function SalesApartmentsPage() {
                 <th className="px-3 py-3 text-left">Комнат</th>
                 <th className="px-3 py-3 text-left">Этаж</th>
                 <th className="px-3 py-3 text-left">Площадь м²</th>
-                <th className="px-3 py-3 text-left">Цена, €</th>
+                <th className="px-3 py-3 text-left">Цена, ₽</th>
                 <th className="px-3 py-3 text-left">Статус</th>
                 <th className="px-3 py-3 text-right">Действия</th>
               </tr>

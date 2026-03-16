@@ -44,7 +44,7 @@ export default function NewApartmentPage() {
     floors_total: "",
     area_m2: "",
     price: "",
-    currency: "USD", // Default currency
+    currency: "RUB", // Default currency
     description: "",
     ai_instructions: "",
   });
@@ -207,9 +207,7 @@ export default function NewApartmentPage() {
                     value={form.currency}
                     onChange={(e) => update("currency", e.target.value)}
                   >
-                    <option value="EUR">EUR (€)</option>
-                    <option value="USD">USD ($)</option>
-                    <option value="TRY">TRY (₺)</option>
+                    <option value="RUB">RUB (₽)</option>
                   </select>
                   <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-neutral-400">
                     <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>

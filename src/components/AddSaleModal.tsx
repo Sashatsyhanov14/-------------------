@@ -5,7 +5,7 @@ import UploadImage from '@/components/UploadImage'
 
 export default function AddSaleModal({ onClose, onCreated, variant = 'secondary' }: { onClose: () => void; onCreated: () => void; variant?: 'secondary' | 'developer' }) {
   const [form, setForm] = useState({
-    city: '', address: '', rooms: 1, price_sale_eur: 0,
+    city: '', address: '', rooms: 1, price_sale_rub: 0,
     new_build: false, developer: '', handover_date: '',
     installment_available: false, commission_percent: 0,
     description: ''
@@ -24,7 +24,7 @@ export default function AddSaleModal({ onClose, onCreated, variant = 'secondary'
           city: form.city,
           address: form.address,
           rooms: form.rooms,
-          price: form.price_sale_eur,
+          price: form.price_sale_rub,
           description: form.description,
           // Removed is_rent
         }])
@@ -65,10 +65,10 @@ export default function AddSaleModal({ onClose, onCreated, variant = 'secondary'
               value={form.rooms} onChange={e => change('rooms', Number(e.target.value))} />
           </div>
           <div>
-            <label className="block text-xs text-zinc-400 mb-1">Цена (€)</label>
+            <label className="block text-xs text-zinc-400 mb-1">Цена (₽)</label>
             <input type="number" min={0} step={1000}
               className="w-full rounded border border-neutral-700 bg-neutral-900 p-2"
-              value={form.price_sale_eur} onChange={e => change('price_sale_eur', Number(e.target.value))} />
+              value={form.price_sale_rub} onChange={e => change('price_sale_rub', Number(e.target.value))} />
           </div>
           <label className="flex items-center gap-2 text-sm text-neutral-300">
             <input type="checkbox" checked={form.new_build} onChange={e => change('new_build', e.target.checked)} />

@@ -45,7 +45,7 @@ export default function EditApartmentPage({ params }: { params: { id: string } }
         floors_total: "",
         area_m2: "",
         price: "",
-        currency: "USD",
+        currency: "RUB",
         description: "",
         ai_instructions: "",
     });
@@ -71,7 +71,7 @@ export default function EditApartmentPage({ params }: { params: { id: string } }
                 // Parse features to extract currency and tags
                 const features = Array.isArray(u.features) ? u.features : [];
                 const currencyTag = features.find((f: string) => f.startsWith("currency:"));
-                const currency = currencyTag ? currencyTag.split(":")[1] : "EUR";
+                const currency = currencyTag ? currencyTag.split(":")[1] : "RUB";
                 const tags = features.filter((f: string) => !f.startsWith("currency:"));
 
                 setForm({
@@ -259,9 +259,7 @@ export default function EditApartmentPage({ params }: { params: { id: string } }
                                         value={form.currency}
                                         onChange={(e) => update("currency", e.target.value)}
                                     >
-                                        <option value="EUR">EUR (€)</option>
-                                        <option value="USD">USD ($)</option>
-                                        <option value="TRY">TRY (₺)</option>
+                                        <option value="RUB">RUB (₽)</option>
                                     </select>
                                     <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-neutral-400">
                                         <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
