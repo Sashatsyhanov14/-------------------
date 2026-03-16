@@ -17,13 +17,13 @@ export async function POST(req: Request) {
         let storagePath = "";
 
         if (url && url.includes("/storage/v1/object/public/")) {
-            // Extract path after bucket name: property-images/ownerId/entity/id/name
-            const parts = url.split("/storage/v1/object/public/property-images/");
+            // Extract path after bucket name: unit_photos/ownerId/entity/id/name
+            const parts = url.split("/storage/v1/object/public/unit_photos/");
             if (parts.length > 1) {
                 storagePath = parts[1];
             } else {
                 // If bucket name is different or structure varies, need careful handling.
-                // For now assuming property-images bucket as it's used in UploadImage.tsx
+                // For now assuming unit_photos bucket as it's used in UploadImage.tsx
                 storagePath = url.split("/").pop() || "";
             }
         } else {
@@ -38,7 +38,7 @@ export async function POST(req: Request) {
 
         // service_role client required for storage management
         const { error } = await sb.storage
-            .from("property-images")
+            .from("unit_photos")
             .remove([storagePath]);
 
         if (error) {

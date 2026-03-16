@@ -105,12 +105,12 @@ export default function CompanyPage() {
                 const key = `public/company/files/${safeName}`;
 
                 const { error: uploadError } = await supabase.storage
-                    .from("property-images") // reusing existing bucket
+                    .from("company_files") // using dedicated bucket
                     .upload(key, file, { upsert: true });
 
                 if (uploadError) throw uploadError;
 
-                const { data: { publicUrl } } = supabase.storage.from("property-images").getPublicUrl(key);
+                const { data: { publicUrl } } = supabase.storage.from("company_files").getPublicUrl(key);
 
                 // Determine type
                 let type = 'document';

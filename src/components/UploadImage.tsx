@@ -38,10 +38,10 @@ export default function UploadImage({
         const safeName = `${ts}-${randomStr}.${ext}`;
         const key = `${ownerUid}/${entity}/${entityId}/${safeName}`;
         const { error } = await supabase.storage
-          .from("property-images")
+          .from("unit_photos")
           .upload(key, file, { upsert: true });
         if (error) throw error;
-        const { data: pub } = supabase.storage.from("property-images").getPublicUrl(key);
+        const { data: pub } = supabase.storage.from("unit_photos").getPublicUrl(key);
         if (pub?.publicUrl) onUploaded(pub.publicUrl);
       }
     } catch (e: any) {

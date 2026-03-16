@@ -231,11 +231,11 @@ export default function UnifiedBotPage() {
                 const key = `public/company/files/${safeName}`;
 
                 const { error: uploadError } = await supabase.storage
-                    .from("property-images")
+                    .from("company_files")
                     .upload(key, file, { upsert: true });
 
                 if (uploadError) throw uploadError;
-                const { data: { publicUrl } } = supabase.storage.from("property-images").getPublicUrl(key);
+                const { data: { publicUrl } } = supabase.storage.from("company_files").getPublicUrl(key);
 
                 let type = 'document';
                 const lowerExt = ext.toLowerCase();
